@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>☢ Strahlungs-Dashboard Österreich</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>☢ Strahlung in Österreich ☢</h1>
+
+  <!-- Zahnrad -->
+  <button id="settingsBtn" onclick="toggleSettings()" title="Einstellungen">⚙️</button>
+
+  <!-- Einstellungs-Panel -->
+  <div id="settingsPanel">
+    <div class="settings-header">⚙️ Einstellungen</div>
+
+    <!-- Dark Mode -->
+    <div class="settings-section">
+      <div class="settings-label">Erscheinungsbild</div>
+      <div class="toggle-row">
+        <span>🌙 Dark Mode</span>
+        <div class="toggle" id="darkToggle" onclick="toggleDark()"></div>
+      </div>
+    </div>
+
+    <!-- Einheiten -->
+    <div class="settings-section">
+      <div class="settings-label">Einheit der Strahlung</div>
+      <div class="unit-btns">
+        <button class="unit-btn active" onclick="setUnit('uSv')" id="btn-uSv">µSv/h</button>
+        <button class="unit-btn"        onclick="setUnit('mSv')" id="btn-mSv">mSv/Jahr</button>
+        <button class="unit-btn"        onclick="setUnit('mrem')"id="btn-mrem">mrem/h</button>
+      </div>
+      <div id="unitHint" style="font-size:11px;color:var(--text-muted);margin-top:10px;line-height:1.5">
+        Alle angezeigten Werte werden automatisch umgerechnet.
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlay zum Schließen -->
+  <div id="settingsOverlay" onclick="closeSettings()"></div>
+</header>
+
+<div class="container">
+
+  <!-- Login -->
+  <div class="card">
+    <h2>Admin Login</h2>
+    <input id="username" placeholder="Benutzername">
+    <input id="password" type="password" placeholder="Passwort">
+    <button onclick="login()">Login</button>
+    <p id="loginStatus"></p>
+  </div>
+
+  <!-- Admin Panel -->
+  <div class="card" id="adminPanel" style="display:none;">
+    <h2>Neue / Bearbeiten</h2>
+    <input id="location" placeholder="Ort">
+    <input id="date" type="date">
+    <input id="altitude" type="number" placeholder="Höhe (m)">
+    <input id="value" type="number" step="0.01" placeholder="µSv/h">
+    <input id="lat" type="number" placeholder="Breitengrad">
+    <input id="lon" type="number" placeholder="Längengrad">
+    <button onclick="saveMeasurement()">Speichern</button>
+    <button onclick="cancelEdit()" style="background:#6b7280">Abbrechen</button>
+  </div>
+
+  <!-- Tabelle -->
+  <div class="card">
+    <h2>Messungen</h2>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortTable('location')" data-col="location">Ort <span class="sort-icon">⇅</span></th>
+            <th onclick="sortTable('date')"     data-col="date">Datum <span class="sort-icon">⇅</span></th>
+            <th onclick="sortTable('altitude')" data-col="altitude">Höhe (m) <span class="sort-icon">⇅</span></th>
+            <th onclick="sortTable('value')"    data-col="value" id="valueColHeader">Strahlung (µSv/h) <span class="sort-icon">⇅</span></th>
+            <th>Status</th>
+            <th id="actionHeader" style="display:none">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody id="measurementBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Statistik -->
+  <div class="card">
+    <h2>Statistik</h2>
+    <div style="display:flex;justify-content:space-around;text-align:center">
+      <div><div id="minValue" style="font-size:24px;font-weight:bold"></div><div>Minimum</div></div>
+      <div><div id="avgValue" style="font-size:24px;font-weight:bold"></div><div>Durchschnitt</div></div>
+      <div><div id="maxValue" style="font-size:24px;font-weight:bold"></div><div>Maximum</div></div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="card">
+    <h2>Balkendiagramm</h2>
+    <canvas id="barChart"></canvas>
+  </div>
+  <div class="card">
+    <h2>Höhe - Strahlung</h2>
+    <canvas id="scatterChart"></canvas>
+  </div>
+
+  <!-- Verteilungsdiagramm -->
+  <div class="card">
+    <h2>Werteverteilung</h2>
+    <p style="font-size:13px;color:var(--text-dim);margin:0 0 14px">
+      Dieses Histogramm zeigt, wie viele Messwerte in welchem Strahlungsbereich liegen – und ob die Verteilung eher niedrig oder hoch ist.
+    </p>
+    <canvas id="histChart"></canvas>
+    <div id="histInfo" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:12px;font-size:13px;"></div>
+  </div>
+
+  <!-- Karte -->
+  <div class="card">
+    <h2>Karte</h2>
+    <div id="mapFilter" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;align-items:center;">
+      <span style="font-size:13px;color:var(--text-dim);font-weight:600;margin-right:4px;">Anzeigen:</span>
+      <button onclick="toggleFilter('green')" id="btn-green" style="background:#16a34a;border:2px solid #16a34a;padding:6px 14px;border-radius:20px;font-size:13px;display:flex;align-items:center;gap:6px;">
+        <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:white;"></span> Niedrig &lt; 0.15
+      </button>
+      <button onclick="toggleFilter('orange')" id="btn-orange" style="background:#d97706;border:2px solid #d97706;padding:6px 14px;border-radius:20px;font-size:13px;display:flex;align-items:center;gap:6px;">
+        <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:white;"></span> Mittel 0.15–0.25
+      </button>
+      <button onclick="toggleFilter('red')" id="btn-red" style="background:#dc2626;border:2px solid #dc2626;padding:6px 14px;border-radius:20px;font-size:13px;display:flex;align-items:center;gap:6px;">
+        <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:white;"></span> Hoch &gt; 0.25
+      </button>
+      <button onclick="resetFilter()" style="background:var(--haus-bg);color:var(--text-dim);border:2px solid var(--haus-border);padding:6px 14px;border-radius:20px;font-size:13px;">
+        Alle anzeigen
+      </button>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <!-- Haus-Verlauf -->
+  <div class="card">
+    <h2>🏠 Strahlungsverlauf — Mein Haus</h2>
+    <p style="font-size:13px;color:var(--text-dim);margin:0 0 16px;">
+      Wöchentliche Messungen zuhause. Daten werden separat gespeichert und nur hier angezeigt.
+    </p>
+
+    <div id="hausAdminBlock" style="display:none;">
+      <div class="haus-eingabe">
+        <div class="input-group">
+          <label>Datum der Messung</label>
+          <input type="date" id="hausDate">
+        </div>
+        <div class="input-group">
+          <label>Strahlung (µSv/h)</label>
+          <input type="number" step="0.001" id="hausValue" placeholder="z.B. 0.112">
+        </div>
+        <button onclick="addHausMeasurement()" style="padding:9px 20px;font-size:14px;white-space:nowrap;align-self:flex-end">
+          ＋ Hinzufügen
+        </button>
+      </div>
+    </div>
+    <div id="hausLockHint" class="haus-lock">
+      🔒 Nur Administratoren können Haus-Messungen eingeben.
+    </div>
+
+    <div style="position:relative;height:300px">
+      <canvas id="hausChart"></canvas>
+    </div>
+
+    <div class="haus-stats">
+      <div class="haus-stat"><div class="val" id="hausMin">—</div><div class="lbl">Minimum</div></div>
+      <div class="haus-stat"><div class="val" id="hausAvg">—</div><div class="lbl">Durchschnitt</div></div>
+      <div class="haus-stat"><div class="val" id="hausMax">—</div><div class="lbl">Maximum</div></div>
+      <div class="haus-stat"><div class="val" id="hausTrend">—</div><div class="lbl">Trend</div></div>
+    </div>
+
+    <div class="haus-table-wrapper">
+      <table class="haus-table">
+        <thead><tr><th>Datum</th><th id="hausValCol">Strahlung (µSv/h)</th><th>Status</th><th></th></tr></thead>
+        <tbody id="hausBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Galerie -->
+  <div class="card">
+    <h2>📷 Fotogalerie — Meine Messungen</h2>
+    <div class="gallery-grid" id="galleryGrid"></div>
+  </div>
+
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox">
+  <button class="lb-close" onclick="closeLightbox()">✕</button>
+  <img id="lbImg" src="" alt="">
+  <div id="lbCaption" class="lb-caption"></div>
+  <div id="lbOrt"     class="lb-ort"></div>
+</div>
+
+<footer style="background:linear-gradient(90deg,#1e3a8a,#0f172a);color:white;text-align:center;padding:25px;margin-top:40px;font-size:14px;">
+  <p><b>☢ Strahlung in Österreich</b></p>
+  <p>Projekt: Radioaktivität in Österreich</p>
+  <p>Daten basierend auf eigenen Messungen</p>
+  <p style="opacity:0.7">© 2026</p>
+</footer>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
