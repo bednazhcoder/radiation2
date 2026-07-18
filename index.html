@@ -2,6 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>☢ Strahlungs-Dashboard Österreich</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" crossorigin="anonymous"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js" crossorigin="anonymous"></script>
@@ -95,10 +96,10 @@
   <!-- Statistik -->
   <div class="card">
     <h2>Statistik</h2>
-    <div style="display:flex;justify-content:space-around;text-align:center">
-      <div><div id="minValue" style="font-size:24px;font-weight:bold"></div><div>Minimum</div></div>
-      <div><div id="avgValue" style="font-size:24px;font-weight:bold"></div><div>Durchschnitt</div></div>
-      <div><div id="maxValue" style="font-size:24px;font-weight:bold"></div><div>Maximum</div></div>
+    <div class="stats-row">
+      <div class="stat-box"><div id="minValue" class="stat-val"></div><div>Minimum</div></div>
+      <div class="stat-box"><div id="avgValue" class="stat-val"></div><div>Durchschnitt</div></div>
+      <div class="stat-box"><div id="maxValue" class="stat-val"></div><div>Maximum</div></div>
     </div>
   </div>
 
@@ -158,7 +159,11 @@
     <!-- Legende für die Bundesländer-Ansicht -->
     <div id="mapLegend" style="display:none;"></div>
 
-    <div id="map"></div>
+    <div id="mapWrapper" class="map-wrapper">
+      <button id="mapExpandBtn" class="map-expand-btn" onclick="toggleMapFullscreen()" title="Karte groß anzeigen">⛶</button>
+      <button id="mapCloseBtn" class="map-close-btn" onclick="toggleMapFullscreen()" title="Schließen">✕ Schließen</button>
+      <div id="map"></div>
+    </div>
     <div id="mapStatus" style="font-size:12px;color:var(--text-muted);margin-top:8px;"></div>
   </div>
 
