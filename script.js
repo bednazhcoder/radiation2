@@ -68,7 +68,7 @@
   }
   // ESC schließt auch Settings
   document.addEventListener("keydown", e => {
-    if(e.key === "Escape") { closeSettings(); closeLightbox(); }
+    if(e.key === "Escape") { closeSettings(); closeLightbox(); closeMapFullscreen(); }
   });
 
   // ════════════════════════════════════════════════════════
@@ -311,7 +311,7 @@
   let hiddenIds = new Set(JSON.parse(localStorage.getItem("hiddenIds") || "[]"));
   let barChart=null, scatterChart=null, histChart=null, map=null;
   let sortCol=null, sortDir=1;
-  const BASE_URL="https://radback-0e7v.onrender.com";
+  const BASE_URL=window.location.origin;
 
   // ── Sicherheit: Admin-Token & HTML-Escaping ────────────
   // Das Admin-Token wird NUR im Speicher gehalten (nicht in localStorage),
@@ -869,6 +869,20 @@
       renderPointMarkers();
     }
     setTimeout(()=>map.invalidateSize(),200);
+  }
+
+  // ── Karte Vollbild (wie Google Maps) ───────────────────
+  function toggleMapFullscreen(){
+    const wrapper = document.getElementById("mapWrapper");
+    const isFullscreen = wrapper.classList.toggle("map-fullscreen");
+    document.body.classList.toggle("map-fullscreen-open", isFullscreen);
+    // Leaflet muss nach einer Größenänderung des Containers neu berechnen,
+    // sonst bleiben Kacheln grau/falsch zugeschnitten.
+    setTimeout(()=>{ if(map) map.invalidateSize(); }, 250);
+  }
+  function closeMapFullscreen(){
+    const wrapper = document.getElementById("mapWrapper");
+    if(wrapper.classList.contains("map-fullscreen")) toggleMapFullscreen();
   }
 
   // ── Login & CRUD ───────────────────────────────────────
