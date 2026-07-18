@@ -311,7 +311,7 @@
   let hiddenIds = new Set(JSON.parse(localStorage.getItem("hiddenIds") || "[]"));
   let barChart=null, scatterChart=null, histChart=null, map=null;
   let sortCol=null, sortDir=1;
-  const BASE_URL=window.location.origin;
+  const BASE_URL="https://radback-0e7v.onrender.com";
 
   // ── Sicherheit: Admin-Token & HTML-Escaping ────────────
   // Das Admin-Token wird NUR im Speicher gehalten (nicht in localStorage),
