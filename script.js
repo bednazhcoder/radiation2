@@ -76,8 +76,8 @@
   // ════════════════════════════════════════════════════════
   const FOTOS = [
     { src:"photos/1.jpg",  caption:"Messung im Waldviertel",     ort:"Arbesbach, Niederösterreich" },
-    { src:"photos/2.jpg",  caption:"Messung auf dem Schneeberg", ort:"Niederösterreich, 2076 m" },
-    { src:"photos/3.jpg",  caption:"Messung im Wienerwald",      ort:"Wien-Umgebung" },
+    { src:"photos/2.jpg",  caption:"Messung im Waldviertel", ort:"Niederösterreich" },
+    { src:"photos/3.jpg",  caption:"Messung im Waldviertel", ort:"Niederösterreich" },
     { src:"photos/8.jpg",  caption:"Messung in Amstetten",       ort:"Amstetten, Niederösterreich" },
     { src:"photos/9.jpg",  caption:"St. Pölten Hauptplatz",           ort:"St. Pölten, Niederösterreich" },
     { src:"photos/12.jpg",  caption:"Melk",       ort:"Melk, Niederösterreich" }, 
