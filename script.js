@@ -68,7 +68,7 @@
   }
   // ESC schließt auch Settings
   document.addEventListener("keydown", e => {
-    if(e.key === "Escape") { closeSettings(); closeLightbox(); closeMapFullscreen(); }
+    if(e.key === "Escape") { closeSettings(); closeLightbox(); closeMapFullscreen(); closeAnyCardFullscreen(); }
   });
 
   // ════════════════════════════════════════════════════════
@@ -76,8 +76,8 @@
   // ════════════════════════════════════════════════════════
   const FOTOS = [
     { src:"photos/1.jpg",  caption:"Messung im Waldviertel",     ort:"Arbesbach, Niederösterreich" },
-    { src:"photos/2.jpg",  caption:"Messung im Waldviertel", ort:"Niederösterreich" },
-    { src:"photos/3.jpg",  caption:"Messung im Waldviertel", ort:"Niederösterreich" },
+    { src:"photos/2.jpg",  caption:"Messung auf dem Schneeberg", ort:"Niederösterreich, 2076 m" },
+    { src:"photos/3.jpg",  caption:"Messung im Wienerwald",      ort:"Wien-Umgebung" },
     { src:"photos/8.jpg",  caption:"Messung in Amstetten",       ort:"Amstetten, Niederösterreich" },
     { src:"photos/9.jpg",  caption:"St. Pölten Hauptplatz",           ort:"St. Pölten, Niederösterreich" },
     { src:"photos/12.jpg",  caption:"Melk",       ort:"Melk, Niederösterreich" }, 
@@ -296,9 +296,9 @@
       const tr=document.createElement("tr");
       const safeDate = escapeHtml(d.date);
       tr.innerHTML=`
-        <td>${escapeHtml(formatDate(d.date))}</td>
-        <td style="font-weight:600;color:${getHausColor(d.value)}">${formatVal(d.value)}</td>
-        <td>${getHausBadge(d.value)}</td>
+        <td data-label="Datum">${escapeHtml(formatDate(d.date))}</td>
+        <td data-label="Strahlung" style="font-weight:600;color:${getHausColor(d.value)}">${formatVal(d.value)}</td>
+        <td data-label="Status">${getHausBadge(d.value)}</td>
         <td>${isAdmin ? `<button class="delete-btn" style="font-size:12px;padding:3px 8px" onclick="deleteHausMeasurement('${safeDate}')">✕</button>` : ""}</td>`;
       tbody.appendChild(tr);
     });
@@ -311,7 +311,7 @@
   let hiddenIds = new Set(JSON.parse(localStorage.getItem("hiddenIds") || "[]"));
   let barChart=null, scatterChart=null, histChart=null, map=null;
   let sortCol=null, sortDir=1;
-  const BASE_URL="https://radback-0e7v.onrender.com";
+  const BASE_URL=window.location.origin;
 
   // ── Sicherheit: Admin-Token & HTML-Escaping ────────────
   // Das Admin-Token wird NUR im Speicher gehalten (nicht in localStorage),
@@ -398,18 +398,18 @@
       const tr=document.createElement("tr");
       if(hidden) tr.classList.add("row-hidden");
       tr.innerHTML=`
-        <td><b>${escapeHtml(m.location)}</b></td>
-        <td>${escapeHtml(m.date)}</td>
-        <td>${escapeHtml(m.altitude)} m</td>
-        <td style="color:${getColor(m.value)};font-weight:bold">${formatVal(m.value)}</td>
-        <td>${getBadge(m.value)}</td>
-        <td>
+        <td data-label="Ort"><b>${escapeHtml(m.location)}</b></td>
+        <td data-label="Datum">${escapeHtml(m.date)}</td>
+        <td data-label="Höhe">${escapeHtml(m.altitude)} m</td>
+        <td data-label="Strahlung (${unitLabel()})" style="color:${getColor(m.value)};font-weight:bold">${formatVal(m.value)}</td>
+        <td data-label="Status">${getBadge(m.value)}</td>
+        <td data-label="Sichtbarkeit">
           <button class="toggle-vis-btn ${hidden ? "btn-hidden" : "btn-visible"}" onclick="toggleVisibility('${m.id}')" title="${hidden ? "Einblenden" : "Ausblenden"}">
             ${hidden ? "👁 ein" : "👁 aus"}
           </button>
         </td>`;
       if(isAdmin){
-        const td=document.createElement("td"); td.className="action-btns";
+        const td=document.createElement("td"); td.className="action-btns"; td.setAttribute("data-label","Aktionen");
         const eb=document.createElement("button"); eb.className="edit-btn"; eb.innerText="Bearbeiten"; eb.onclick=()=>startEdit(m);
         const db=document.createElement("button"); db.className="delete-btn"; db.innerText="Löschen"; db.onclick=()=>deleteMeasurement(m.id);
         td.appendChild(eb); td.appendChild(db); tr.appendChild(td);
@@ -418,8 +418,8 @@
     });
   }
 
-  function sortTable(col){
-    sortDir=sortCol===col?sortDir*-1:1; sortCol=col;
+  function applySort(col, dir){
+    sortCol=col; sortDir=dir;
     document.querySelectorAll("thead th[data-col]").forEach(th=>{
       const icon=th.querySelector(".sort-icon");
       if(th.dataset.col===col){th.classList.add("active");icon.textContent=sortDir===1?"↑":"↓";}
@@ -427,6 +427,31 @@
     });
     renderTable();
   }
+  function sortTable(col){
+    applySort(col, sortCol===col?sortDir*-1:1);
+  }
+  // Für das mobile Sortier-Dropdown (ersetzt die anklickbaren Tabellen-Header)
+  function mobileSortChange(value){
+    if(!value) return;
+    const idx = value.lastIndexOf("-");
+    const col = value.slice(0,idx), dir = value.slice(idx+1);
+    applySort(col, dir==="asc"?1:-1);
+  }
+
+  // Liefert eine an die Bildschirmbreite angepasste Tick-Schriftgröße für Diagramme.
+  function chartTickFont(){ return window.innerWidth < 640 ? 10 : 12; }
+
+  let _resizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(() => {
+      if(barChart) barChart.resize();
+      if(histChart) histChart.resize();
+      if(scatterChart) scatterChart.resize();
+      if(hausChart) hausChart.resize();
+      if(map) map.invalidateSize();
+    }, 150);
+  });
 
   function createCharts(){
     const measurements = visibleMeasurements();
@@ -446,10 +471,11 @@
         }]
       },
       options:{
+        responsive:true, maintainAspectRatio:false,
         plugins:{legend:{display:false}},
         scales:{
           y:{beginAtZero:true,title:{display:true,text:unitLabel(),color:textColor},ticks:{color:textColor},grid:{color:gridColor}},
-          x:{ticks:{color:textColor},grid:{color:gridColor}}
+          x:{ticks:{color:textColor,maxRotation:60,minRotation:0,autoSkip:true,autoSkipPadding:8,font:{size:chartTickFont()}},grid:{color:gridColor}}
         }
       }
     });
@@ -467,6 +493,7 @@
         {label:"Regression",data:[{x:mnx,y:sl*mnx+ic},{x:mxx,y:sl*mxx+ic}],type:"line",borderColor:darkMode?"#94a3b8":"black",fill:false,tension:0}
       ]},
       options:{
+        responsive:true, maintainAspectRatio:false,
         scales:{
           x:{type:"linear",title:{display:true,text:"Strahlung ("+unitLabel()+")",color:textColor},ticks:{color:textColor},grid:{color:gridColor}},
           y:{title:{display:true,text:"Höhe (m)",color:textColor},ticks:{color:textColor},grid:{color:gridColor}}
@@ -521,6 +548,7 @@
         }]
       },
       options: {
+        responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -533,7 +561,7 @@
         scales: {
           x: {
             title: { display: true, text: "Strahlung (" + unitLabel() + ")", color: textColor },
-            ticks: { color: textColor, maxRotation: 60, autoSkip: false, font: { size: 10 } },
+            ticks: { color: textColor, maxRotation: 60, minRotation: 0, autoSkip: true, autoSkipPadding: 6, font: { size: chartTickFont() } },
             grid: { color: gridColor }
           },
           y: {
@@ -545,7 +573,6 @@
         }
       }
     });
-
     // Info-Kacheln unter dem Histogramm
     const low  = bins.filter(b=>(b.from+b.to)/2 < lowThresh).reduce((a,b)=>a+b.count,0);
     const mid  = bins.filter(b=>{const m=(b.from+b.to)/2; return m>=lowThresh&&m<highThresh;}).reduce((a,b)=>a+b.count,0);
@@ -605,8 +632,17 @@
   let choroplethLayer = null;
   const AUSTRIA_GEOJSON_URL = "https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@main/public/data/austria-states.geojson";
 
+  // ── Geplante Messpunkte (Admin-Planungswerkzeug) ──────────
+  // Blaue Punkte, die der Admin auf der Karte setzt, um zu sehen, wo noch
+  // eine Messung fehlt. Wird nur lokal im Browser des Admins gespeichert.
+  let plannedPoints = JSON.parse(localStorage.getItem("plannedPoints") || "[]"); // [{id,lat,lon,note}]
+  let planningMode  = false;                                    // Klick-auf-Karte-Modus aktiv?
+  let showPlanned   = localStorage.getItem("showPlanned") === "1"; // Sichtbarkeits-Toggle
+  let plannedLayerGroup = null;
+
   function setMapMode(mode){
     mapMode = mode;
+    if(mode!=="points" && planningMode) togglePlanningMode();
     ["points","bundeslaender","heatmap"].forEach(m=>{
       const btn = document.getElementById("btn-mode-"+m);
       if(btn) btn.classList.toggle("active", mode===m);
@@ -614,6 +650,7 @@
     document.getElementById("mapFilter").style.display = mode==="points" ? "flex" : "none";
     document.getElementById("mapLegend").style.display  = mode==="bundeslaender" ? "flex" : "none";
     document.getElementById("mapStatus").textContent = "";
+    updateAdminMapTools();
     initMap();
   }
 
@@ -767,11 +804,83 @@
       const lat=Number(m.lat),lon=Number(m.lon);
       if(isNaN(lat)||isNaN(lon)) return;
       const category=getCategory(m.value);
-      const marker=L.circleMarker([lat,lon],{radius:10,fillColor:getColor(m.value),color:"#000",weight:1,fillOpacity:0.85})
+      const marker=L.circleMarker([lat,lon],{radius:10,fillColor:getColor(m.value),color:"#000",weight:1,fillOpacity:0.85,bubblingMouseEvents:false})
         .bindPopup(`<b>${escapeHtml(m.location)}</b><br>Datum: ${escapeHtml(m.date)}<br>Höhe: ${escapeHtml(m.altitude)} m<br>Strahlung: ${formatVal(m.value)}`);
       mapMarkers.push({marker,category});
       if(filterActive[category]) marker.addTo(map);
     });
+  }
+
+  // ── Geplante Messpunkte: Speichern, Anzeigen, Umschalten ──
+  function savePlannedPoints(){
+    localStorage.setItem("plannedPoints", JSON.stringify(plannedPoints));
+  }
+
+  function renderPlannedLayer(){
+    if(plannedLayerGroup){ plannedLayerGroup.remove(); plannedLayerGroup=null; }
+    if(!map) return;
+    plannedLayerGroup = L.layerGroup();
+    plannedPoints.forEach(p=>{
+      const marker = L.circleMarker([p.lat, p.lon], {
+        radius:10, color:"#1d4ed8", weight:2,
+        fillColor:"#3b82f6", fillOpacity:0.85,
+        dashArray:"3,3", bubblingMouseEvents:false
+      }).bindPopup(
+        `<b>📍 Geplanter Messpunkt</b>${p.note ? "<br>"+escapeHtml(p.note) : ""}<br>
+         <button onclick="removePlannedPoint('${p.id}')" class="delete-btn" style="margin-top:6px;font-size:12px;padding:4px 10px;">Entfernen</button>`
+      );
+      plannedLayerGroup.addLayer(marker);
+    });
+    if(showPlanned) plannedLayerGroup.addTo(map);
+  }
+
+  function addPlannedPoint(latlng){
+    if(!isAdmin) return;
+    const note = prompt("Notiz zum geplanten Messpunkt (optional):", "") || "";
+    plannedPoints.push({
+      id: Date.now()+"_"+Math.random().toString(36).slice(2,7),
+      lat: latlng.lat, lon: latlng.lng, note
+    });
+    savePlannedPoints();
+    renderPlannedLayer();
+  }
+
+  function removePlannedPoint(id){
+    plannedPoints = plannedPoints.filter(p=>p.id!==id);
+    savePlannedPoints();
+    renderPlannedLayer();
+  }
+
+  function togglePlanningMode(){
+    if(!isAdmin) return;
+    planningMode = !planningMode;
+    const btn = document.getElementById("btnPlanningMode");
+    if(btn){
+      btn.classList.toggle("active", planningMode);
+      btn.innerHTML = planningMode ? "✅ Klicke auf die Karte…" : "📍 Punkt planen";
+    }
+    const mapEl = document.getElementById("map");
+    if(mapEl) mapEl.style.cursor = planningMode ? "crosshair" : "";
+    // Beim Aktivieren des Planungsmodus automatisch die geplanten Punkte einblenden,
+    // damit man sofort sieht, was schon geplant ist.
+    if(planningMode && !showPlanned) togglePlannedVisibility();
+  }
+
+  function togglePlannedVisibility(){
+    showPlanned = !showPlanned;
+    localStorage.setItem("showPlanned", showPlanned ? "1" : "0");
+    const btn = document.getElementById("btnTogglePlanned");
+    if(btn) btn.classList.toggle("active", showPlanned);
+    renderPlannedLayer();
+  }
+
+  // Zeigt/versteckt die Admin-Planungswerkzeuge je nach Login-Status & Kartenmodus
+  function updateAdminMapTools(){
+    const tools = document.getElementById("adminMapTools");
+    if(!tools) return;
+    tools.style.display = (isAdmin && mapMode==="points") ? "flex" : "none";
+    const btnPlan = document.getElementById("btnTogglePlanned");
+    if(btnPlan) btnPlan.classList.toggle("active", showPlanned);
   }
 
   // ── Heatmap ──────────────────────────────────────────────
@@ -861,6 +970,10 @@
     map=L.map("map",{center:[47.6,14.5],zoom:7});
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
 
+    // Admin-Planungsmodus: Klick auf freie Kartenfläche setzt einen blauen Punkt.
+    // (Bestehende Messpunkte haben bubblingMouseEvents:false und lösen dies daher nicht aus.)
+    map.on("click", e => { if(isAdmin && planningMode) addPlannedPoint(e.latlng); });
+
     if(mapMode==="bundeslaender"){
       renderChoropleth();
     } else if(mapMode==="heatmap"){
@@ -868,6 +981,7 @@
     } else {
       renderPointMarkers();
     }
+    renderPlannedLayer();
     setTimeout(()=>map.invalidateSize(),200);
   }
 
@@ -883,6 +997,23 @@
   function closeMapFullscreen(){
     const wrapper = document.getElementById("mapWrapper");
     if(wrapper.classList.contains("map-fullscreen")) toggleMapFullscreen();
+  }
+
+  // ── Beliebige Karte (Statistik/Diagramm/Haus) Vollbild ─
+  function toggleCardFullscreen(cardId){
+    const card = document.getElementById(cardId);
+    if(!card) return;
+    const isFullscreen = card.classList.toggle("card-fullscreen");
+    document.body.classList.toggle("card-fullscreen-open", isFullscreen);
+    setTimeout(()=>{
+      if(barChart) barChart.resize();
+      if(histChart) histChart.resize();
+      if(scatterChart) scatterChart.resize();
+      if(hausChart) hausChart.resize();
+    }, 260);
+  }
+  function closeAnyCardFullscreen(){
+    document.querySelectorAll(".card.card-fullscreen").forEach(c => toggleCardFullscreen(c.id));
   }
 
   // ── Login & CRUD ───────────────────────────────────────
@@ -906,6 +1037,7 @@
         document.getElementById("hausLockHint").style.display="none";
         const logoutBtn=document.getElementById("logoutBtn");
         if(logoutBtn) logoutBtn.style.display="inline-block";
+        updateAdminMapTools();
         updateDashboard();
         renderHaus();
       } else {
@@ -918,12 +1050,16 @@
     isAdmin=false;
     adminToken=null;
     editId=null;
+    planningMode=false;
+    const mapEl = document.getElementById("map");
+    if(mapEl) mapEl.style.cursor = "";
     document.getElementById("adminPanel").style.display="none";
     document.getElementById("hausAdminBlock").style.display="none";
     document.getElementById("hausLockHint").style.display="block";
     document.getElementById("loginStatus").innerText="";
     const logoutBtn=document.getElementById("logoutBtn");
     if(logoutBtn) logoutBtn.style.display="none";
+    updateAdminMapTools();
     updateDashboard();
     renderHaus();
   }
@@ -981,3 +1117,4 @@
   loadMeasurements();
   renderGallery();
   loadHausDaten();
+  updateAdminMapTools();
