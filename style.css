@@ -47,12 +47,13 @@
     *, *::before, *::after { box-sizing: border-box; }
     body { font-family: Arial, sans-serif; margin:0; background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s; }
 
-    header { background:linear-gradient(90deg,#1e3a8a,#0f172a); color:white; padding:40px 50px; text-align:center; position:relative; }
-    header h1 { margin:0; font-size:clamp(1.4rem,4vw,2.2rem); }
+    header { background:linear-gradient(90deg,#1e3a8a,#0f172a); color:white; padding:40px 76px; text-align:center; position:relative; }
+    header h1 { margin:0; font-size:clamp(1.4rem,4vw,2.2rem); line-height:1.3; }
 
     .container { max-width:1200px; margin:auto; padding:20px; }
 
     .card {
+      position:relative;
       background:var(--card);
       border:1px solid var(--card-border);
       padding:20px; margin-bottom:20px;
@@ -124,6 +125,84 @@
     .stats-row { display:flex; justify-content:space-around; text-align:center; flex-wrap:wrap; gap:14px; }
     .stat-box  { flex:1; min-width:100px; }
     .stat-val  { font-size:24px; font-weight:bold; }
+    .stat-lbl  { color:var(--text-dim); }
+
+    /* ══════════════════════════════════════════════
+       KARTEN GROSS ANZEIGEN (Statistik / Diagramme / Haus)
+       ── gleiches Prinzip wie bei der Karte ──
+    ══════════════════════════════════════════════ */
+    .expand-btn {
+      position:absolute; top:14px; right:14px; z-index:20;
+      width:34px; height:34px; padding:0; margin:0;
+      background:var(--haus-bg); color:var(--text-dim);
+      border:1px solid var(--card-border);
+      border-radius:6px; font-size:16px;
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer;
+    }
+    .expand-btn:hover { background:var(--table-hover); color:var(--text); }
+
+    .card-close-btn { display:none; }
+
+    .card.card-fullscreen {
+      position:fixed; inset:14px; z-index:9998;
+      overflow-y:auto;
+      display:flex; flex-direction:column;
+      box-shadow:0 8px 40px rgba(0,0,0,0.35);
+    }
+    .card.card-fullscreen .expand-btn { display:none; }
+    .card.card-fullscreen .card-close-btn {
+      display:flex; align-items:center; justify-content:center; gap:6px;
+      position:sticky; top:0; align-self:flex-end;
+      width:auto; height:auto; margin-bottom:10px; margin-left:auto;
+      padding:10px 16px; font-size:14px; font-weight:600;
+      background:#1e3a8a; color:white; border:none;
+      border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.25);
+      cursor:pointer; z-index:5;
+    }
+    .card.card-fullscreen .card-close-btn:hover { background:#2a4fa8; }
+
+    body.card-fullscreen-open { overflow:hidden; }
+
+    /* Vergrößerte Statistik-Zahlen im Vollbild */
+    .card.card-fullscreen .stats-row { flex:1; align-items:center; }
+    .card.card-fullscreen .stat-val  { font-size:clamp(40px,9vw,88px); }
+    .card.card-fullscreen .stat-lbl  { font-size:clamp(15px,2.2vw,20px); }
+
+    /* Diagramm-Container */
+    .chart-fixed-height { position:relative; height:320px; }
+
+    .card.card-fullscreen .chart-fixed-height {
+      height:calc(100vh - 160px);
+    }
+
+    /* ══════════════════════════════════════════════
+       DESKTOP: Statistik/Diagramme/Haus direkt groß —
+       kein Vollbild-Klick nötig (nur auf dem Handy sinnvoll)
+    ══════════════════════════════════════════════ */
+    @media(min-width:641px){
+      .expand-btn { display:none; }
+      .chart-fixed-height { height:480px; }
+      .stat-val { font-size:42px; }
+      .stat-lbl { font-size:16px; }
+    }
+
+    /* Schnellsprung-Button zur Statistik */
+    .jump-fab {
+      position:fixed; bottom:22px; right:22px; z-index:600;
+      display:flex; align-items:center; gap:6px;
+      background:#1e3a8a; color:white; border:none;
+      padding:12px 18px; margin:0; border-radius:30px;
+      font-size:14px; font-weight:600;
+      box-shadow:0 4px 14px rgba(0,0,0,0.3);
+      cursor:pointer;
+    }
+    .jump-fab:hover { background:#2a4fa8; }
+
+    @media(max-width:640px){
+      .card.card-fullscreen { inset:8px; }
+      .jump-fab { bottom:16px; right:16px; padding:10px 14px; font-size:13px; }
+    }
 
     /* ══════════════════════════════════════════════
        EINSTELLUNGS-ZAHNRAD
@@ -416,41 +495,78 @@
     /* ══════════════════════════════════════════════
        MOBILE-ANPASSUNGEN
     ══════════════════════════════════════════════ */
+    .mobile-sort-select { display:none; }
+
     @media(max-width:640px){
       body { font-size:16px; }
 
-      header { padding:22px 16px 28px; }
-      header h1 { line-height:1.3; }
-      #settingsBtn { top:14px; right:14px; width:40px; height:40px; font-size:18px; }
-      #settingsPanel { right:10px; left:10px; width:auto; top:66px; }
+      header { padding:20px 56px 26px; }
+      header h1 { line-height:1.3; font-size:1.15rem; }
+      #settingsBtn { top:14px; right:12px; width:38px; height:38px; font-size:17px; }
+      #settingsPanel { right:10px; left:10px; width:auto; top:64px; }
 
       .container { padding:12px; }
       .card { padding:16px; margin-bottom:16px; border-radius:10px; }
-      .card h2 { font-size:18px; }
+      .card h2 { font-size:18px; padding-right:26px; }
+
+      .expand-btn { top:12px; right:12px; width:32px; height:32px; font-size:15px; }
 
       /* Login/Admin-Formulare: Felder & Buttons untereinander, volle Breite = leichter zu treffen */
       .card > input { display:block; width:100%; margin:6px 0; box-sizing:border-box; }
-      .card > button { display:block; width:100%; margin:6px 0; padding:12px; font-size:15px; }
+      .card > button:not(.expand-btn):not(.card-close-btn) { display:block; width:100%; margin:6px 0; padding:12px; font-size:15px; }
 
       button { padding:10px 16px; min-height:44px; font-size:15px; }
       .toggle-vis-btn { min-height:32px; padding:6px 10px; font-size:12px; }
 
-      /* Tabelle: größere, besser lesbare Schrift; bleibt horizontal scrollbar */
-      table { font-size:15px; }
-      thead th { padding:12px 12px; font-size:13px; }
-      tbody td { padding:12px 12px; }
-      .action-btns { flex-direction:column; gap:6px; }
-      .action-btns button { width:100%; }
+      /* Mobiler Sortier-Dropdown ersetzt die anklickbaren Tabellen-Header */
+      .mobile-sort-select {
+        display:block; width:100%; margin-bottom:12px;
+        padding:11px 12px; font-size:15px; border-radius:8px;
+        border:1px solid var(--input-border);
+        background:var(--input-bg); color:var(--text);
+      }
 
-      .haus-table { font-size:14px; }
-      .haus-table thead th, .haus-table tbody td { padding:10px 10px; }
+      /* ── Tabellen als Karten statt enger Zeilen ── */
+      .table-wrapper, .haus-table-wrapper { overflow-x:visible; }
+      .table-wrapper table, .haus-table { font-size:15px; }
+      .table-wrapper thead, .haus-table thead { display:none; }
+      .table-wrapper tbody tr, .haus-table tbody tr {
+        display:block;
+        background:var(--card);
+        border:1px solid var(--card-border);
+        border-radius:10px;
+        margin-bottom:12px;
+        padding:4px 14px;
+      }
+      .table-wrapper tbody tr:hover, .haus-table tbody tr:hover { background:var(--card); }
+      .table-wrapper tbody td, .haus-table tbody td {
+        display:flex; justify-content:space-between; align-items:center;
+        gap:10px; padding:10px 0; text-align:right;
+        border-bottom:1px solid var(--card-border);
+      }
+      .table-wrapper tbody td:last-child, .haus-table tbody td:last-child { border-bottom:none; }
+      .table-wrapper tbody td::before, .haus-table tbody td::before {
+        content:attr(data-label);
+        font-weight:600; color:var(--text-dim);
+        text-align:left; font-size:11px;
+        text-transform:uppercase; letter-spacing:0.04em;
+        flex-shrink:0;
+      }
+      .table-wrapper tbody td.action-btns::before { content:none; }
+      .table-wrapper tbody td.action-btns { display:flex; gap:8px; }
+      .table-wrapper tbody td.action-btns button { flex:1; width:auto; }
+
       .haus-stat .val { font-size:20px; }
 
       .unit-btn, .map-mode-btn { font-size:14px; padding:9px 14px; }
-      #mapFilter button { font-size:13px; padding:8px 14px; }
+      #mapFilter button, #adminMapTools button { font-size:13px; padding:8px 14px; }
 
       #map { height:280px; }
       .gallery-caption { font-size:14px; }
 
       canvas { max-width:100%; }
+
+      /* Diagramme: feste Höhe statt Zerquetschen — alle Balken bleiben ohne Scrollen sichtbar */
+      .chart-fixed-height { height:260px; }
+      .card.card-fullscreen .chart-fixed-height { height:calc(100vh - 140px); }
     }
