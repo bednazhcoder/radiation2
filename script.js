@@ -432,16 +432,11 @@
 
   // ── Untergrund (Geologie) ──────────────────────────────
   const GEO = {
-    granit:     { label:"Granit & Gneis (Böhmische Masse)", short:"Granit / Gneis", color:"#be185d",
-                  desc:"Enthält mehr natürliches Uran, Thorium und Kalium-40. Deshalb liegen die Werte hier meist am höchsten." },
-    kristallin: { label:"Kristallin & Schiefer (Zentralalpen)", short:"Zentralalpen", color:"#7c3aed",
-                  desc:"Gneise und Schiefer der Alpen. Mittlere Werte; in großer Höhe kommt mehr kosmische Strahlung dazu, Schnee schirmt den Boden ab." },
-    flysch:     { label:"Flysch (Sandstein & Mergel)", short:"Flysch", color:"#0891b2",
-                  desc:"Sandsteine und Mergel am Alpennordrand, etwa im Wienerwald. Meist mittlere Werte." },
-    sediment:   { label:"Sedimente (Molasse, Becken, Schotter)", short:"Sedimente", color:"#a16207",
-                  desc:"Lockere Ablagerungen in Becken und Tälern. Der Wert hängt davon ab, aus welchem Gestein das Material stammt." },
-    kalk:       { label:"Kalk & Dolomit (Kalkalpen u. a.)", short:"Kalk / Dolomit", color:"#2563eb",
-                  desc:"Karbonatgesteine enthalten wenig Uran und Thorium. Deshalb liegen die Werte meist am niedrigsten." },
+    granit:     { label:"Granit & Gneis (Böhmische Masse)", short:"Granit / Gneis", color:"#be185d"},
+    kristallin: { label:"Kristallin & Schiefer (Zentralalpen)", short:"Zentralalpen", color:"#7c3aed" },
+    flysch:     { label:"Flysch (Sandstein & Mergel)", short:"Flysch", color:"#0891b2"},
+    sediment:   { label:"Sedimente (Molasse, Becken, Schotter)", short:"Sedimente", color:"#a16207" },
+    kalk:       { label:"Kalk & Dolomit (Kalkalpen u. a.)", short:"Kalk / Dolomit", color:"#2563eb" },
     unbekannt:  { label:"Unbekannt", short:"Unbekannt", color:"#64748b", desc:"Noch kein Untergrund zugeordnet." }
   };
   // Eigenes Feld der Messung hat Vorrang, sonst die Zuordnung aus geology-data.js
