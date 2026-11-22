@@ -10,8 +10,21 @@
 </head>
 <body>
 
-<header>
-  <h1>☢ Strahlung in Österreich ☢</h1>
+<!-- Intro-Bildschirm: erstes, was man sieht — dann runterscrollen für das Dashboard -->
+<section class="hero" id="hero">
+  <div class="hero-content">
+    <div class="hero-icon">☢</div>
+    <h1 class="hero-title">Strahlung in Österreich</h1>
+    <p class="hero-subtitle">Messdaten der Umgebungsradioaktivität aus ganz Österreich — Karten, Verläufe und Statistiken auf einen Blick.</p>
+    <button class="hero-scroll-btn" onclick="document.getElementById('mainHeader').scrollIntoView({behavior:'smooth'})" title="Nach unten scrollen">
+      <span>Nach unten scrollen</span>
+      <span class="hero-arrow">↓</span>
+    </button>
+  </div>
+</section>
+
+<header id="mainHeader">
+  <h1>☢ Radioaktivität in Österreich ☢</h1>
 
   <!-- Zahnrad -->
   <button id="settingsBtn" onclick="toggleSettings()" title="Einstellungen">⚙️</button>
@@ -41,6 +54,27 @@
         Alle angezeigten Werte werden automatisch umgerechnet.
       </div>
     </div>
+
+    <!-- Farbschwellen -->
+    <div class="settings-section">
+      <div class="settings-label">Farbschwellen (µSv/h)</div>
+      <div class="thresh-row">
+        <label class="thresh-field"><span class="dot dot-green"></span> bis
+          <input type="number" id="threshLow" step="0.01" min="0.01" onchange="onThresholdChange()">
+        </label>
+        <label class="thresh-field"><span class="dot dot-red"></span> ab
+          <input type="number" id="threshHigh" step="0.01" min="0.01" onchange="onThresholdChange()">
+        </label>
+      </div>
+      <div id="threshError" class="thresh-error"></div>
+      <button class="unit-btn" onclick="resetThresholds()" style="margin-top:8px">Standard (0.15 / 0.25)</button>
+      <details class="thresh-info">
+        <summary>Woher kommen diese Werte?</summary>
+        <p>Das sind <b>Orientierungswerte für dieses Projekt</b>, keine offiziellen Grenzwerte. Sie sollen nur zeigen, welche Messungen im Vergleich zu den übrigen auffallen.</p>
+        <p>Die natürliche Umgebungsstrahlung in Österreich liegt meist grob bei 0,07–0,20 µSv/h. In Granitgebieten (Wald- und Mühlviertel) und in großer Höhe ist sie höher, das ist natürlich und unbedenklich.</p>
+        <p>Die Werte gelten immer in µSv/h, unabhängig von der gewählten Einheit. <i>Grün</i> = unter dem ersten Wert, <i>Orange</i> = dazwischen, <i>Rot</i> = ab dem zweiten Wert. Die Einstellung wird in deinem Browser gespeichert.</p>
+      </details>
+    </div>
   </div>
 
   <!-- Overlay zum Schließen -->
@@ -68,6 +102,14 @@
     <input id="value" type="number" step="0.01" placeholder="µSv/h">
     <input id="lat" type="number" placeholder="Breitengrad">
     <input id="lon" type="number" placeholder="Längengrad">
+    <select id="geology" title="Untergrund">
+      <option value="">Untergrund (unbekannt)</option>
+      <option value="granit">Granit &amp; Gneis</option>
+      <option value="kristallin">Kristallin &amp; Schiefer (Zentralalpen)</option>
+      <option value="flysch">Flysch</option>
+      <option value="sediment">Sedimente (Molasse, Becken, Schotter)</option>
+      <option value="kalk">Kalk &amp; Dolomit</option>
+    </select>
     <button onclick="saveMeasurement()">Speichern</button>
     <button onclick="cancelEdit()" style="background:#6b7280">Abbrechen</button>
   </div>
@@ -83,6 +125,7 @@
       <option value="date-asc">Datum (alt → neu)</option>
       <option value="altitude-asc">Höhe (niedrig → hoch)</option>
       <option value="altitude-desc">Höhe (hoch → niedrig)</option>
+      <option value="geology-asc">Untergrund (A–Z)</option>
       <option value="value-asc">Strahlung (niedrig → hoch)</option>
       <option value="value-desc">Strahlung (hoch → niedrig)</option>
     </select>
@@ -93,6 +136,7 @@
             <th onclick="sortTable('location')" data-col="location">Ort <span class="sort-icon">⇅</span></th>
             <th onclick="sortTable('date')"     data-col="date">Datum <span class="sort-icon">⇅</span></th>
             <th onclick="sortTable('altitude')" data-col="altitude">Höhe (m) <span class="sort-icon">⇅</span></th>
+            <th onclick="sortTable('geology')"  data-col="geology">Untergrund <span class="sort-icon">⇅</span></th>
             <th onclick="sortTable('value')"    data-col="value" id="valueColHeader">Strahlung (µSv/h) <span class="sort-icon">⇅</span></th>
             <th>Status</th>
             <th>Sichtbarkeit</th>
@@ -142,6 +186,23 @@
     <div id="histInfo" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:12px;font-size:13px;"></div>
   </div>
 
+  <!-- Untergrund -->
+  <div class="card" id="geoCard">
+    <button class="expand-btn" onclick="toggleCardFullscreen('geoCard')" title="Groß anzeigen">⛶</button>
+    <button class="card-close-btn" onclick="toggleCardFullscreen('geoCard')">✕ Schließen</button>
+    <h2>🪨 Strahlung nach Untergrund</h2>
+    <p style="font-size:13px;color:var(--text-dim);margin:0 0 14px">
+      Die natürliche Strahlung kommt zu einem großen Teil aus dem Gestein. Jeder Punkt ist eine Messung, der schwarze Strich ist der Mittelwert der Gruppe.
+    </p>
+    <div class="chart-fixed-height"><canvas id="geoChart"></canvas></div>
+    <div id="geoInsight" class="geo-insight"></div>
+    <div id="geoStats" class="geo-grid"></div>
+    <p class="geo-disclaimer">
+      Der Untergrund wurde nach der groben geologischen Gliederung Österreichs dem jeweiligen Ort zugeordnet, nicht direkt vor Ort bestimmt.
+      Bei ⚠ liegt der Ort in einer Grenzzone und die Zuordnung ist unsicher. Genauer sieht man es in der geologischen Karte von GeoSphere Austria.
+    </p>
+  </div>
+
   <!-- Karte -->
   <div class="card">
     <h2>Karte</h2>
@@ -157,18 +218,21 @@
       <button class="map-mode-btn" id="btn-mode-heatmap" onclick="setMapMode('heatmap')">
         🌡️ Heatmap
       </button>
+      <button class="map-mode-btn" id="btn-mode-geology" onclick="setMapMode('geology')">
+        🪨 Untergrund
+      </button>
     </div>
 
     <div id="mapFilter" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;align-items:center;">
       <span style="font-size:13px;color:var(--text-dim);font-weight:600;margin-right:4px;">Anzeigen:</span>
       <button onclick="toggleFilter('green')" id="btn-green" style="background:#16a34a;border:2px solid #16a34a;padding:6px 14px;border-radius:20px;font-size:13px;display:flex;align-items:center;gap:6px;">
-        <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:white;"></span> Niedrig &lt; 0.15
+        <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:white;"></span> <span id="lbl-green">Niedrig &lt; 0.15</span>
       </button>
       <button onclick="toggleFilter('orange')" id="btn-orange" style="background:#d97706;border:2px solid #d97706;padding:6px 14px;border-radius:20px;font-size:13px;display:flex;align-items:center;gap:6px;">
-        <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:white;"></span> Mittel 0.15–0.25
+        <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:white;"></span> <span id="lbl-orange">Mittel 0.15–0.25</span>
       </button>
       <button onclick="toggleFilter('red')" id="btn-red" style="background:#dc2626;border:2px solid #dc2626;padding:6px 14px;border-radius:20px;font-size:13px;display:flex;align-items:center;gap:6px;">
-        <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:white;"></span> Hoch &gt; 0.25
+        <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:white;"></span> <span id="lbl-red">Hoch &gt; 0.25</span>
       </button>
       <button onclick="resetFilter()" style="background:var(--haus-bg);color:var(--text-dim);border:2px solid var(--haus-border);padding:6px 14px;border-radius:20px;font-size:13px;">
         Alle anzeigen
@@ -272,6 +336,7 @@
 </button>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js" crossorigin="anonymous"></script>
+<script src="geology-data.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

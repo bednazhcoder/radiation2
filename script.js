@@ -22,6 +22,63 @@
   }
   function unitLabel() { return UNITS[unit].label; }
 
+  // ── Farbschwellen (immer in µSv/h gespeichert, anpassbar in den Einstellungen) ──
+  const DEFAULT_THRESH = { low: 0.15, high: 0.25 };
+  let THRESH = loadThresholds();
+
+  function loadThresholds() {
+    try {
+      const t = JSON.parse(localStorage.getItem("thresholds") || "null");
+      if (t && isFinite(t.low) && isFinite(t.high) && t.low > 0 && t.high > t.low) {
+        return { low: Number(t.low), high: Number(t.high) };
+      }
+    } catch (e) {}
+    return { ...DEFAULT_THRESH };
+  }
+
+  function fmtThresh(v) { return String(parseFloat(v.toFixed(3))); }
+
+  // Beschriftung der Karten-Filter-Buttons aktualisieren
+  function updateFilterLabels() {
+    const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    const lo = fmtThresh(THRESH.low), hi = fmtThresh(THRESH.high);
+    set("lbl-green",  "Niedrig < " + lo);
+    set("lbl-orange", "Mittel " + lo + "–" + hi);
+    set("lbl-red",    "Hoch > " + hi);
+  }
+
+  function initThresholdUI() {
+    const lo = document.getElementById("threshLow");
+    const hi = document.getElementById("threshHigh");
+    if (lo) lo.value = fmtThresh(THRESH.low);
+    if (hi) hi.value = fmtThresh(THRESH.high);
+    const err = document.getElementById("threshError");
+    if (err) err.textContent = "";
+    updateFilterLabels();
+  }
+
+  function onThresholdChange() {
+    const lo = parseFloat(document.getElementById("threshLow").value);
+    const hi = parseFloat(document.getElementById("threshHigh").value);
+    const err = document.getElementById("threshError");
+    if (!(lo > 0) || !(hi > 0)) { err.textContent = "Bitte positive Zahlen eingeben."; return; }
+    if (hi <= lo)               { err.textContent = "Der obere Wert muss größer als der untere sein."; return; }
+    err.textContent = "";
+    THRESH = { low: lo, high: hi };
+    localStorage.setItem("thresholds", JSON.stringify(THRESH));
+    updateFilterLabels();
+    updateDashboard();
+    renderHaus();
+  }
+
+  function resetThresholds() {
+    THRESH = { ...DEFAULT_THRESH };
+    localStorage.removeItem("thresholds");
+    initThresholdUI();
+    updateDashboard();
+    renderHaus();
+  }
+
   // Dark Mode anwenden
   function applyDark() {
     document.body.classList.toggle("dark", darkMode);
@@ -71,13 +128,15 @@
     if(e.key === "Escape") { closeSettings(); closeLightbox(); closeMapFullscreen(); closeAnyCardFullscreen(); }
   });
 
+  initThresholdUI();
+
   // ════════════════════════════════════════════════════════
   //  📸 FOTOS
   // ════════════════════════════════════════════════════════
   const FOTOS = [
     { src:"photos/1.jpg",  caption:"Messung im Waldviertel",     ort:"Arbesbach, Niederösterreich" },
-    { src:"photos/2.jpg",  caption:"Messung im Waldviertel", ort:"Niederösterreich, 2076 m" },
-    { src:"photos/3.jpg",  caption:"Messung im Waldviertel",      ort:"Wien-Umgebung" },
+    { src:"photos/2.jpg",  caption:"Messung auf dem Schneeberg", ort:"Niederösterreich, 2076 m" },
+    { src:"photos/3.jpg",  caption:"Messung im Wienerwald",      ort:"Wien-Umgebung" },
     { src:"photos/8.jpg",  caption:"Messung in Amstetten",       ort:"Amstetten, Niederösterreich" },
     { src:"photos/9.jpg",  caption:"St. Pölten Hauptplatz",           ort:"St. Pölten, Niederösterreich" },
     { src:"photos/12.jpg",  caption:"Melk",       ort:"Melk, Niederösterreich" }, 
@@ -214,10 +273,10 @@
     const [y,m,d]=iso.split("-"); return d+"."+m+"."+y;
   }
 
-  function getHausColor(v){ return v<0.15?"#16a34a":v<0.25?"#d97706":"#dc2626"; }
+  function getHausColor(v){ return v<THRESH.low?"#16a34a":v<THRESH.high?"#d97706":"#dc2626"; }
   function getHausBadge(v){
-    if(v<0.15) return '<span class="badge badge-green">niedrig</span>';
-    if(v<0.25) return '<span class="badge badge-orange">mittel</span>';
+    if(v<THRESH.low) return '<span class="badge badge-green">niedrig</span>';
+    if(v<THRESH.high) return '<span class="badge badge-orange">mittel</span>';
     return '<span class="badge badge-red">hoch</span>';
   }
 
@@ -311,7 +370,13 @@
   let hiddenIds = new Set(JSON.parse(localStorage.getItem("hiddenIds") || "[]"));
   let barChart=null, scatterChart=null, histChart=null, map=null;
   let sortCol=null, sortDir=1;
-  const BASE_URL="https://radback-0e7v.onrender.com";
+  // Läuft die Seite lokal (localhost/127.0.0.1 oder direkt als Datei geöffnet)?
+  // Dann automatisch den lokalen Server verwenden, sonst den Render-Server.
+  // So funktioniert dieselbe Datei auf localhost UND auf Netlify — keine zwei Versionen mehr nötig.
+  const IS_LOCAL = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
+  const BASE_URL = IS_LOCAL
+    ? "http://localhost:3000"
+    : "https://radback-0e7v.onrender.com";
 
   // ── Sicherheit: Admin-Token & HTML-Escaping ────────────
   // Das Admin-Token wird NUR im Speicher gehalten (nicht in localStorage),
@@ -344,10 +409,10 @@
     updateDashboard();
   }
 
-  function getColor(v){ return v<0.15?"green":v<0.25?"orange":"red"; }
+  function getColor(v){ return v<THRESH.low?"green":v<THRESH.high?"orange":"red"; }
   function getBadge(v){
-    if(v<0.15) return '<span class="badge badge-green">niedrig</span>';
-    if(v<0.25) return '<span class="badge badge-orange">mittel</span>';
+    if(v<THRESH.low) return '<span class="badge badge-green">niedrig</span>';
+    if(v<THRESH.high) return '<span class="badge badge-orange">mittel</span>';
     return '<span class="badge badge-red">hoch</span>';
   }
 
@@ -364,7 +429,143 @@
     }catch(e){console.error("Fehler:",e);}
   }
 
-  function updateDashboard(){ updateStats(); renderTable(); createCharts(); initMap(); }
+
+  // ── Untergrund (Geologie) ──────────────────────────────
+  const GEO = {
+    granit:     { label:"Granit & Gneis (Böhmische Masse)", short:"Granit / Gneis", color:"#be185d",
+                  desc:"Enthält mehr natürliches Uran, Thorium und Kalium-40. Deshalb liegen die Werte hier meist am höchsten." },
+    kristallin: { label:"Kristallin & Schiefer (Zentralalpen)", short:"Zentralalpen", color:"#7c3aed",
+                  desc:"Gneise und Schiefer der Alpen. Mittlere Werte; in großer Höhe kommt mehr kosmische Strahlung dazu, Schnee schirmt den Boden ab." },
+    flysch:     { label:"Flysch (Sandstein & Mergel)", short:"Flysch", color:"#0891b2",
+                  desc:"Sandsteine und Mergel am Alpennordrand, etwa im Wienerwald. Meist mittlere Werte." },
+    sediment:   { label:"Sedimente (Molasse, Becken, Schotter)", short:"Sedimente", color:"#a16207",
+                  desc:"Lockere Ablagerungen in Becken und Tälern. Der Wert hängt davon ab, aus welchem Gestein das Material stammt." },
+    kalk:       { label:"Kalk & Dolomit (Kalkalpen u. a.)", short:"Kalk / Dolomit", color:"#2563eb",
+                  desc:"Karbonatgesteine enthalten wenig Uran und Thorium. Deshalb liegen die Werte meist am niedrigsten." },
+    unbekannt:  { label:"Unbekannt", short:"Unbekannt", color:"#64748b", desc:"Noch kein Untergrund zugeordnet." }
+  };
+  // Eigenes Feld der Messung hat Vorrang, sonst die Zuordnung aus geology-data.js
+  function geoOf(m){
+    const fb = (window.GEOLOGY_BY_ID || {})[m.id] || {};
+    const key = GEO[m.geology] ? m.geology : (GEO[fb.g] ? fb.g : "unbekannt");
+    const own = !!GEO[m.geology];
+    return { key, info:GEO[key], conf: own ? "hoch" : (fb.c || "hoch"), note: own ? "" : (fb.n || "") };
+  }
+  function geoChip(m){
+    const g = geoOf(m);
+    const warn = g.conf === "mittel" ? ' <span title="Grenzlage, Zuordnung unsicher">⚠</span>' : "";
+    const tip = (g.note ? g.note : g.info.label).replace(/"/g,"&quot;");
+    return `<span class="geo-chip" style="--gc:${g.info.color}" title="${tip}"><i></i>${g.info.short}${warn}</span>`;
+  }
+  const geoFilterActive = {};
+  let geoMarkers = [];
+  let geoChart = null;
+
+  function createGeoChart(){
+    const canvas = document.getElementById("geoChart");
+    if(!canvas) return;
+    if(geoChart){ geoChart.destroy(); geoChart = null; }
+    const groups = {};
+    visibleMeasurements().forEach(m => { const k = geoOf(m).key; (groups[k] = groups[k] || []).push(m); });
+    const mean = a => a.reduce((s,m)=>s+m.value,0)/a.length;
+    const keys = Object.keys(groups).sort((a,b)=>mean(groups[a])-mean(groups[b]));
+    renderGeoStats(keys, groups, mean);
+    if(!keys.length) return;
+
+    const textColor = darkMode ? "#94a3b8" : "#666";
+    const gridColor = darkMode ? "#2d3748" : "#e5e7eb";
+    const dec = UNITS[unit].decimals;
+    const datasets = keys.map((k,i) => ({
+      label: GEO[k].short, type:"scatter",
+      data: groups[k].map((m,j) => ({ x: i + (((j*37)%100)/100 - 0.5)*0.55, y: convertValue(m.value), m })),
+      backgroundColor: GEO[k].color + "b3", borderColor: GEO[k].color, pointRadius: 6, pointHoverRadius: 9
+    }));
+    datasets.push({
+      label:"Mittelwert", type:"scatter",
+      data: keys.map((k,i)=>({ x:i, y:convertValue(mean(groups[k])) })),
+      pointStyle:"line", pointRadius:26, pointHoverRadius:26, borderWidth:4,
+      borderColor: darkMode ? "#f1f5f9" : "#111827"
+    });
+    geoChart = new Chart(canvas, {
+      data:{ datasets },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{ display:false },
+          tooltip:{ callbacks:{ label: ctx => ctx.raw.m
+            ? ctx.raw.m.location + ": " + formatVal(ctx.raw.m.value)
+            : "Mittelwert: " + ctx.parsed.y.toFixed(dec) + " " + unitLabel() } }
+        },
+        scales:{
+          x:{ type:"linear", min:-0.6, max:keys.length-0.4, grid:{display:false},
+              ticks:{ stepSize:1, color:textColor, font:{size:chartTickFont()},
+                callback: v => (Number.isInteger(v) && keys[v]) ? [GEO[keys[v]].short, "n = " + groups[keys[v]].length] : "" } },
+          y:{ title:{display:true, text:unitLabel(), color:textColor}, grid:{color:gridColor}, ticks:{color:textColor}, beginAtZero:false }
+        }
+      }
+    });
+  }
+
+  function renderGeoStats(keys, groups, mean){
+    const grid = document.getElementById("geoStats");
+    const ins  = document.getElementById("geoInsight");
+    if(!grid) return;
+    if(!keys.length){ grid.innerHTML = ""; if(ins) ins.textContent = ""; return; }
+    grid.innerHTML = keys.map(k => {
+      const arr = groups[k], vals = arr.map(m=>m.value);
+      const unsure = arr.filter(m => geoOf(m).conf === "mittel").length;
+      return `<div class="geo-card" style="--gc:${GEO[k].color}">
+        <div class="geo-card-title">${GEO[k].label}</div>
+        <div class="geo-card-val">Ø ${formatVal(mean(arr))}</div>
+        <div class="geo-card-range">${formatVal(Math.min(...vals))} – ${formatVal(Math.max(...vals))} · ${arr.length} Messungen${unsure ? " · " + unsure + " ⚠" : ""}</div>
+        <div class="geo-card-desc">${GEO[k].desc}</div>
+      </div>`;
+    }).join("");
+    if(ins){
+      const good = keys.filter(k => k !== "unbekannt" && groups[k].length >= 3);
+      if(good.length >= 2){
+        const lo = good[0], hi = good[good.length-1];
+        const f = mean(groups[hi]) / mean(groups[lo]);
+        ins.innerHTML = `<b>${GEO[hi].short}</b> liegt im Schnitt bei ${formatVal(mean(groups[hi]))}, das ist das <b>${f.toFixed(1).replace(".",",")}-Fache</b> von <b>${GEO[lo].short}</b> (${formatVal(mean(groups[lo]))}).`;
+      } else ins.textContent = "";
+    }
+  }
+
+  function renderGeoLegend(){
+    const el = document.getElementById("mapLegend");
+    const counts = {};
+    visibleMeasurements().forEach(m => { const k = geoOf(m).key; counts[k] = (counts[k]||0) + 1; });
+    const keys = Object.keys(GEO).filter(k => counts[k]);
+    el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;width:100%;">
+      <span style="font-weight:700;color:var(--text-dim);font-size:12px;">Untergrund (anklicken zum Ein-/Ausblenden):</span>
+      ${keys.map(k => `<button class="geo-legend-btn ${geoFilterActive[k]===false ? "off" : ""}" style="--gc:${GEO[k].color}" onclick="toggleGeoFilter('${k}')"><i></i>${GEO[k].short} (${counts[k]})</button>`).join("")}
+      <span style="font-size:11px;color:var(--text-muted);">Gestrichelter Rand = Zuordnung unsicher (Grenzlage)</span>
+    </div>`;
+  }
+  function toggleGeoFilter(k){
+    geoFilterActive[k] = (geoFilterActive[k] === false);
+    renderGeoLegend();
+    geoMarkers.forEach(({marker,key}) => { if(geoFilterActive[key] === false) marker.remove(); else marker.addTo(map); });
+  }
+  function renderGeologyMarkers(){
+    geoMarkers = [];
+    visibleMeasurements().forEach(m => {
+      const lat = Number(m.lat), lon = Number(m.lon);
+      if(isNaN(lat) || isNaN(lon)) return;
+      const g = geoOf(m);
+      const marker = L.circleMarker([lat,lon], {
+        radius:10, fillColor:g.info.color, color:"#000", weight: g.conf==="mittel" ? 2 : 1,
+        dashArray: g.conf==="mittel" ? "3 3" : null, fillOpacity:0.85, bubblingMouseEvents:false
+      }).bindPopup(`<b>${escapeHtml(m.location)}</b><br>Untergrund: ${g.info.label}${g.conf==="mittel" ? " ⚠" : ""}`
+        + (g.note ? `<br><span style="font-size:12px">${escapeHtml(g.note)}</span>` : "")
+        + `<br>Strahlung: ${formatVal(m.value)}<br>Höhe: ${escapeHtml(m.altitude)} m`);
+      geoMarkers.push({marker, key:g.key});
+      if(geoFilterActive[g.key] !== false) marker.addTo(map);
+    });
+    renderGeoLegend();
+  }
+
+  function updateDashboard(){ updateStats(); renderTable(); createCharts(); createGeoChart(); initMap(); }
 
   function updateStats(){
     const vis = visibleMeasurements();
@@ -401,6 +602,7 @@
         <td data-label="Ort"><b>${escapeHtml(m.location)}</b></td>
         <td data-label="Datum">${escapeHtml(m.date)}</td>
         <td data-label="Höhe">${escapeHtml(m.altitude)} m</td>
+        <td data-label="Untergrund">${geoChip(m)}</td>
         <td data-label="Strahlung (${unitLabel()})" style="color:${getColor(m.value)};font-weight:bold">${formatVal(m.value)}</td>
         <td data-label="Status">${getBadge(m.value)}</td>
         <td data-label="Sichtbarkeit">
@@ -448,6 +650,7 @@
       if(barChart) barChart.resize();
       if(histChart) histChart.resize();
       if(scatterChart) scatterChart.resize();
+      if(geoChart) geoChart.resize();
       if(hausChart) hausChart.resize();
       if(map) map.invalidateSize();
     }, 150);
@@ -522,8 +725,8 @@
     });
 
     // Farbe je nach Bereich (grün/orange/rot basierend auf µSv/h Grenzwerten, umgerechnet)
-    const lowThresh  = convertValue(0.15);
-    const highThresh = convertValue(0.25);
+    const lowThresh  = convertValue(THRESH.low);
+    const highThresh = convertValue(THRESH.high);
     const binColors = bins.map(b => {
       const mid = (b.from + b.to) / 2;
       if(mid < lowThresh)  return "rgba(22,163,74,0.75)";
@@ -599,7 +802,7 @@
 
   // ── Karte & Filter ─────────────────────────────────────
   const filterActive={green:true,orange:true,red:true};
-  function getCategory(v){ return v<0.15?"green":v<0.25?"orange":"red"; }
+  function getCategory(v){ return v<THRESH.low?"green":v<THRESH.high?"orange":"red"; }
 
   function toggleFilter(color){
     filterActive[color]=!filterActive[color];
@@ -643,12 +846,12 @@
   function setMapMode(mode){
     mapMode = mode;
     if(mode!=="points" && planningMode) togglePlanningMode();
-    ["points","bundeslaender","heatmap"].forEach(m=>{
+    ["points","bundeslaender","heatmap","geology"].forEach(m=>{
       const btn = document.getElementById("btn-mode-"+m);
       if(btn) btn.classList.toggle("active", mode===m);
     });
     document.getElementById("mapFilter").style.display = mode==="points" ? "flex" : "none";
-    document.getElementById("mapLegend").style.display  = mode==="bundeslaender" ? "flex" : "none";
+    document.getElementById("mapLegend").style.display  = (mode==="bundeslaender" || mode==="geology") ? "flex" : "none";
     document.getElementById("mapStatus").textContent = "";
     updateAdminMapTools();
     initMap();
@@ -805,7 +1008,7 @@
       if(isNaN(lat)||isNaN(lon)) return;
       const category=getCategory(m.value);
       const marker=L.circleMarker([lat,lon],{radius:10,fillColor:getColor(m.value),color:"#000",weight:1,fillOpacity:0.85,bubblingMouseEvents:false})
-        .bindPopup(`<b>${escapeHtml(m.location)}</b><br>Datum: ${escapeHtml(m.date)}<br>Höhe: ${escapeHtml(m.altitude)} m<br>Strahlung: ${formatVal(m.value)}`);
+        .bindPopup(`<b>${escapeHtml(m.location)}</b><br>Datum: ${escapeHtml(m.date)}<br>Höhe: ${escapeHtml(m.altitude)} m<br>Untergrund: ${geoOf(m).info.short}<br>Strahlung: ${formatVal(m.value)}`);
       mapMarkers.push({marker,category});
       if(filterActive[category]) marker.addTo(map);
     });
@@ -966,7 +1169,7 @@
   }
 
   function initMap(){
-    if(map){map.remove();map=null;} mapMarkers=[]; choroplethLayer=null;
+    if(map){map.remove();map=null;} mapMarkers=[]; geoMarkers=[]; choroplethLayer=null;
     map=L.map("map",{center:[47.6,14.5],zoom:7});
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
 
@@ -978,6 +1181,8 @@
       renderChoropleth();
     } else if(mapMode==="heatmap"){
       renderHeatmap();
+    } else if(mapMode==="geology"){
+      renderGeologyMarkers();
     } else {
       renderPointMarkers();
     }
@@ -1009,6 +1214,7 @@
       if(barChart) barChart.resize();
       if(histChart) histChart.resize();
       if(scatterChart) scatterChart.resize();
+      if(geoChart) geoChart.resize();
       if(hausChart) hausChart.resize();
     }, 260);
   }
@@ -1072,15 +1278,16 @@
     document.getElementById("value").value=m.value;
     document.getElementById("lat").value=m.lat;
     document.getElementById("lon").value=m.lon;
+    const gk = geoOf(m).key; document.getElementById("geology").value = gk==="unbekannt" ? "" : gk;
     document.getElementById("adminPanel").scrollIntoView({behavior:"smooth"});
   }
   function cancelEdit(){
     editId=null;
-    ["location","date","altitude","value","lat","lon"].forEach(id=>document.getElementById(id).value="");
+    ["location","date","altitude","value","lat","lon","geology"].forEach(id=>document.getElementById(id).value="");
   }
   async function saveMeasurement(){
     if(!isAdmin){ alert("Nur Admins können Messungen speichern."); return; }
-    const data={location:document.getElementById("location").value,date:document.getElementById("date").value,altitude:Number(document.getElementById("altitude").value),value:Number(document.getElementById("value").value),lat:Number(document.getElementById("lat").value),lon:Number(document.getElementById("lon").value)};
+    const data={location:document.getElementById("location").value,date:document.getElementById("date").value,altitude:Number(document.getElementById("altitude").value),value:Number(document.getElementById("value").value),lat:Number(document.getElementById("lat").value),lon:Number(document.getElementById("lon").value),geology:document.getElementById("geology").value||undefined};
     try{
       let res;
       if(editId){
